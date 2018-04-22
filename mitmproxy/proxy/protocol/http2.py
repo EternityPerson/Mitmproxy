@@ -650,5 +650,6 @@ class Http2SingleStreamLayer(httpbase._HttpTransmissionLayer, basethread.BaseThr
             self.log("Changing the Host server for HTTP/2 connections not allowed: {}".format(e), "info")
         except exceptions.Kill:  # pragma: no cover
             self.log("Connection killed", "info")
+            self.client_conn.finish()
 
         self.kill()

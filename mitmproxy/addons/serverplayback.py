@@ -86,9 +86,13 @@ class ServerPlayback:
         self.flowmap = {}
         for i in flows:
             if i.response:  # type: ignore
-                l = self.flowmap.setdefault(self._hash(i), [])
+                sh = self._hash(i)
+                l = self.flowmap.setdefault(sh, [])
+                ctx.log.warn("flow: " + str(i))
+                ctx.log.warn("flow hash: " + str(sh))
                 l.append(i)
         ctx.master.addons.trigger("update", [])
+        ctx.log.warn("Finished loading all flows=================================================")
 
     @command.command("replay.server.file")
     def load_file(self, path: mitmproxy.types.Path) -> None:
@@ -118,7 +122,10 @@ class ServerPlayback:
         _, _, path, _, query, _ = urllib.parse.urlparse(r.url)
         queriesArray = urllib.parse.parse_qsl(query, keep_blank_values=True)
 
-        key: typing.List[typing.Any] = [str(r.port), str(r.scheme), str(r.method), str(path)]
+        # key: typing.List[typing.Any] = [str(r.port), str(r.scheme), str(r.method), str(path)]
+        key = [str(r.port), str(r.scheme), str(r.method), str(path)]  # type: List[Any]
+        ctx.log.warn("===========================11111111111======================================")
+        ctx.log.warn("key: {}".format(key))
         if not ctx.options.server_replay_ignore_content:
             if ctx.options.server_replay_ignore_payload_params and r.multipart_form:
                 key.extend(
@@ -140,14 +147,20 @@ class ServerPlayback:
 
         filtered = []
         ignore_params = ctx.options.server_replay_ignore_params or []
+        ctx.log.warn("ignore_params: {}".format(ignore_params))
         ignore_param_regex = ctx.options.server_replay_ignore_param_regex
         for p in queriesArray:
             if p[0] not in ignore_params:
+                ctx.log.warn("if {}".format(p[0]))
                 filtered.append(p)
         for p in filtered:
+            ctx.log.warn("Before p[0]:p[1] - {}:{}".format(p[0], p[1]))
+            ctx.log.warn("ignore_param_regex: {}".format(ignore_param_regex));
+            ctx.log.warn("re.compile(ignore_param_regex).match: {}".format(re.compile(ignore_param_regex).match(p[0])));
             if ignore_param_regex and not re.compile(ignore_param_regex).match(p[0]):
                 key.append(p[0])
                 key.append(p[1])
+                ctx.log.warn("p[0]:p[1] - {}:{}".format(p[0], p[1]))
 
         if ctx.options.server_replay_use_headers:
             headers = []
@@ -155,9 +168,12 @@ class ServerPlayback:
                 v = r.headers.get(i)
                 headers.append((i, v))
             key.append(headers)
-        return hashlib.sha256(
-            repr(key).encode("utf8", "surrogateescape")
-        ).digest()
+
+        ctx.log.warn("key 2: {}".format(key))
+        result = hashlib.sha256(repr(key).encode("utf8", "surrogateescape")).digest()
+        ctx.log.warn("hsh 1st: {}".format(result))
+        return result
+
 
     def next_flow(self, request):
         """
@@ -189,7 +205,9 @@ class ServerPlayback:
 
     def request(self, f):
         if self.flowmap:
+            ctx.log.warn("Inside self.flowmap")
             rflow = self.next_flow(f)
+            ctx.log.warn("rflow: {}".format(rflow))
             if rflow:
                 response = rflow.response.copy()
                 response.is_replay = True
@@ -206,3 +224,4 @@ class ServerPlayback:
                     )
                 )
                 f.reply.kill()
+        ctx.log.warn("33333333333333333333333333333333333333333333333333333333333333333333333333")
