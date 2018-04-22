@@ -1,6 +1,7 @@
 import hashlib
 import urllib
 import typing
+import re
 
 from mitmproxy import ctx
 from mitmproxy import flow
@@ -49,10 +50,16 @@ class ServerPlayback:
             "Ignore request's content while searching for a saved flow to replay."
         )
         loader.add_option(
-            "server_replay_ignore_params", typing.Sequence[str], [],
+            "server_replay_ignore_params", typing.Sequence[str], ["now"],
             """
             Request's parameters to be ignored while searching for a saved flow
             to replay.
+            """
+        )
+        loader.add_option(
+            "server_replay_ignore_param_regex", str, "\d{13,13}",
+            """
+            Regex to ignore a request's parameter while searching for a saved flow to replay
             """
         )
         loader.add_option(
@@ -133,12 +140,14 @@ class ServerPlayback:
 
         filtered = []
         ignore_params = ctx.options.server_replay_ignore_params or []
+        ignore_param_regex = ctx.options.server_replay_ignore_param_regex
         for p in queriesArray:
             if p[0] not in ignore_params:
                 filtered.append(p)
         for p in filtered:
-            key.append(p[0])
-            key.append(p[1])
+            if ignore_param_regex and not re.compile(ignore_param_regex).match(p[0]):
+                key.append(p[0])
+                key.append(p[1])
 
         if ctx.options.server_replay_use_headers:
             headers = []
