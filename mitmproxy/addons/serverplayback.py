@@ -140,6 +140,7 @@ class ServerPlayback:
                     if k not in ctx.options.server_replay_ignore_payload_params
                 )
             else:
+                r.raw_content = re.sub(',"dateTime":"(.+?)"', '', '{}'.format(r.raw_content))
                 key.append(str(r.raw_content))
 
         if not ctx.options.server_replay_ignore_host:
