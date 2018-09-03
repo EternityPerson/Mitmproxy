@@ -50,7 +50,7 @@ class ServerPlayback:
             "Ignore request's content while searching for a saved flow to replay."
         )
         loader.add_option(
-            "server_replay_ignore_params", typing.Sequence[str], ["now"],
+            "server_replay_ignore_params", typing.Sequence[str], [],
             """
             Request's parameters to be ignored while searching for a saved flow
             to replay.
@@ -148,12 +148,16 @@ class ServerPlayback:
 
         filtered = []
         ignore_params = ctx.options.server_replay_ignore_params or []
+        if ignore_params:
+            ignore_params = ignore_params[0].split(' ');
         ctx.log.warn("ignore_params: {}".format(ignore_params))
         ignore_param_regex = ctx.options.server_replay_ignore_param_regex
         for p in queriesArray:
             if p[0] not in ignore_params:
                 ctx.log.warn("if {}".format(p[0]))
-                filtered.append(p)
+                filtered.append(p) 
+            else:
+                ctx.log.warn("Filtered out {}".format(p[0]))
         for p in filtered:
             ctx.log.warn("Before p[0]:p[1] - {}:{}".format(p[0], p[1]))
             ctx.log.warn("ignore_param_regex: {}".format(ignore_param_regex));
