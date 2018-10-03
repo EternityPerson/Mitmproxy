@@ -86,13 +86,15 @@ class ServerPlayback:
         self.flowmap = {}
         for i in flows:
             if i.response:  # type: ignore
+                ctx.log.warn("=========================Add flow to flowmap=====================\n");
                 sh = self._hash(i)
                 l = self.flowmap.setdefault(sh, [])
-                ctx.log.warn("flow: " + str(i))
-                ctx.log.warn("flow hash: " + str(sh))
                 l.append(i)
+                ctx.log.warn("Flows: {}\n".format(l))
+                ctx.log.warn("Flows hash: {}\n".format(sh))
+                ctx.log.warn("===================Finished adding flow to flowmap===============\n");
         ctx.master.addons.trigger("update", [])
-        ctx.log.warn("Finished loading all flows=================================================")
+        ctx.log.warn("=========================Finished loading all flows=======================")
 
     @command.command("replay.server.file")
     def load_file(self, path: mitmproxy.types.Path) -> None:
@@ -118,14 +120,14 @@ class ServerPlayback:
             Calculates a loose hash of the flow request.
         """
         r = flow.request
+        ctx.log.warn("Flow request url is: {}\n".format(r.url))
 
         _, _, path, _, query, _ = urllib.parse.urlparse(r.url)
         queriesArray = urllib.parse.parse_qsl(query, keep_blank_values=True)
 
         # key: typing.List[typing.Any] = [str(r.port), str(r.scheme), str(r.method), str(path)]
         key = [str(r.port), str(r.scheme), str(r.method), str(path)]  # type: List[Any]
-        ctx.log.warn("===========================11111111111======================================")
-        ctx.log.warn("key: {}".format(key))
+        ctx.log.warn("Initial key: {}".format(key))
         if not ctx.options.server_replay_ignore_content:
             if ctx.options.server_replay_ignore_payload_params and r.multipart_form:
                 key.extend(
@@ -152,31 +154,32 @@ class ServerPlayback:
             ignore_params = ignore_params[0].split(' ');
         ctx.log.warn("ignore_params: {}".format(ignore_params))
         ignore_param_regex = ctx.options.server_replay_ignore_param_regex
+
+        ctx.log.warn("Unfiltered queriesArray: {}\n".format(queriesArray))
         for p in queriesArray:
             if p[0] not in ignore_params:
-                ctx.log.warn("if {}".format(p[0]))
                 filtered.append(p) 
-            else:
-                ctx.log.warn("Filtered out {}".format(p[0]))
+        ctx.log.warn("Filtered by params, queriesArray: {}\n".format(filtered))
+
         for p in filtered:
-            ctx.log.warn("Before p[0]:p[1] - {}:{}".format(p[0], p[1]))
-            ctx.log.warn("ignore_param_regex: {}".format(ignore_param_regex));
-            ctx.log.warn("re.compile(ignore_param_regex).match: {}".format(re.compile(ignore_param_regex).match(p[0])));
             if ignore_param_regex and not re.compile(ignore_param_regex).match(p[0]):
                 key.append(p[0])
                 key.append(p[1])
-                ctx.log.warn("p[0]:p[1] - {}:{}".format(p[0], p[1]))
+            else:
+                ctx.log.warn("Filtered param {} by regex".format(p))
 
-        if ctx.options.server_replay_use_headers:
+        ignore_headers = ctx.options.server_replay_use_headers or []
+        if ignore_headers:
             headers = []
-            for i in ctx.options.server_replay_use_headers:
+            ignore_headers = ignore_headers[0].split(' ');
+            for i in ignore_headers:
                 v = r.headers.get(i)
                 headers.append((i, v))
             key.append(headers)
 
-        ctx.log.warn("key 2: {}".format(key))
+        ctx.log.warn("Final key before hashing: {}\n".format(key))
         result = hashlib.sha256(repr(key).encode("utf8", "surrogateescape")).digest()
-        ctx.log.warn("hsh 1st: {}".format(result))
+        ctx.log.warn("Key hash: {}\n".format(result))
         return result
 
 
@@ -185,7 +188,9 @@ class ServerPlayback:
             Returns the next flow object, or None if no matching flow was
             found.
         """
+        ctx.log.warn("----------------------------Start Hashing Request-------------------------\n")
         hsh = self._hash(request)
+        ctx.log.warn("--------------------------Finished Hashing Request--------------------------")
         if hsh in self.flowmap:
             if ctx.options.server_replay_nopop:
                 return self.flowmap[hsh][0]
@@ -209,10 +214,10 @@ class ServerPlayback:
             ctx.master.addons.trigger("processing_complete")
 
     def request(self, f):
+        ctx.log.warn("===========================Start Matching Request=========================\n")
         if self.flowmap:
-            ctx.log.warn("Inside self.flowmap")
             rflow = self.next_flow(f)
-            ctx.log.warn("rflow: {}".format(rflow))
+            ctx.log.warn("Matched response: {}".format(rflow))
             if rflow:
                 response = rflow.response.copy()
                 response.is_replay = True
@@ -224,9 +229,10 @@ class ServerPlayback:
                     self.stop = True
             elif ctx.options.server_replay_kill_extra:
                 ctx.log.warn(
-                    "server_playback: killed non-replay request {}".format(
+                    "Killing non-replay request with url {}".format(
                         f.request.url
                     )
                 )
                 f.reply.kill()
-        ctx.log.warn("33333333333333333333333333333333333333333333333333333333333333333333333333")
+        ctx.log.warn("\n=======================-Finished Matching Request=========================")
+
